@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+node_modules
+.pnp*
+vendor/
+.venv/
+venv/
+
+# Build output
+dist/
+build/
+.build/
+out/
+target/
+.turbo/
+.next/
+.vite/
+*.tsbuildinfo
+*.o
+*.dylib
+*.app
+*.tar.gz
+
+# Logs, caches, coverage
+*.log
+logs/
+coverage/
+.nyc_output/
+
+# OS and editor noise
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+
+# Local configuration (copy .env.example to .env, config.example.yaml to config.yaml)
+.env
+.env.*
+!.env.example
+/config.yaml
+/config.yml
+
+# Local data
+data/
+
+# Internal notes must never ship in the public repo
+docs/research/
+docs/internal/
+docs/launch/
+
+# Coverage reports
+coverage/

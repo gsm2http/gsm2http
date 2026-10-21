@@ -1,0 +1,14 @@
+# udev rules for USB modems driven by gsm2http.
+#   sudo cp deploy/udev/99-gsm2http.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload && sudo udevadm trigger
+#
+# Replace 12d1 (Huawei) with your modem's USB vendor id from `lsusb`, or
+# duplicate the lines for each vendor (e.g. 19d2 ZTE, 1199 Sierra, 2c7c Quectel).
+
+# Tell ModemManager to leave these modems alone. If both talk AT to the same
+# port they corrupt each other's command/response stream.
+ACTION=="add|change", SUBSYSTEM=="usb", ATTRS{idVendor}=="12d1", ENV{ID_MM_DEVICE_IGNORE}="1"
+ACTION=="add|change", SUBSYSTEM=="tty", ATTRS{idVendor}=="12d1", ENV{ID_MM_DEVICE_IGNORE}="1"
+
+# Group-accessible serial ports (most distributions already default to this)
+SUBSYSTEM=="tty", KERNEL=="ttyUSB[0-9]*|ttyACM[0-9]*", GROUP="dialout", MODE="0660"

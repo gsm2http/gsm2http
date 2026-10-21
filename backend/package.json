@@ -1,0 +1,55 @@
+{
+  "name": "@gsm2http/backend",
+  "version": "0.1.0-alpha.0",
+  "private": true,
+  "description": "gsm2http server: REST API, Socket.io stream and webhooks for USB GSM/3G/LTE modems",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/gsm2http/gsm2http#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gsm2http/gsm2http.git",
+    "directory": "backend"
+  },
+  "bugs": {
+    "url": "https://github.com/gsm2http/gsm2http/issues"
+  },
+  "engines": {
+    "node": ">=20.19"
+  },
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts | pino-pretty",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.build.json",
+    "start": "node dist/index.js",
+    "test": "LOG_LEVEL=silent node --import tsx --test \"src/**/*.test.ts\"",
+    "test:coverage": "mkdir -p coverage && LOG_LEVEL=silent node --import tsx --test --experimental-test-coverage --test-coverage-include=\"src/modem/*Parser.ts\" --test-coverage-include=src/modem/SmsReassembler.ts --test-coverage-include=\"src/modem/drivers/**\" --test-coverage-exclude=\"**/*.test.ts\" --test-coverage-exclude=src/modem/drivers/testUtils.ts --test-coverage-lines=90 --test-coverage-branches=75 --test-coverage-functions=90 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info \"src/**/*.test.ts\"",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "helmet": "^8.3.0",
+    "mqtt": "^5.16.1",
+    "pino": "^10.4.0",
+    "serialport": "^13.0.0",
+    "socket.io": "^4.8.3",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.13.3",
+    "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.13.0",
+    "pino-pretty": "^13.2.0",
+    "socket.io-client": "^4.8.4",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.2",
+    "typescript-eslint": "^8.71.2"
+  }
+}

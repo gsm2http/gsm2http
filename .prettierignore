@@ -1,0 +1,7 @@
+node_modules/
+dist/
+package-lock.json
+# Hand-formatted prose and specs
+*.md
+docs/
+.github/ISSUE_TEMPLATE/
