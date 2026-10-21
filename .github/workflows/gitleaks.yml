@@ -1,0 +1,43 @@
+name: Secret scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gitleaks-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # The gitleaks CLI needs no licence key (gitleaks-action does for organisations).
+      # Scans the full history, so a secret added and removed within a PR is still caught.
+      - name: Install gitleaks
+        env:
+          VERSION: 8.30.1
+          SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          curl -fsSLo gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz"
+          echo "${SHA256}  gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf gitleaks.tar.gz -C "$RUNNER_TEMP" gitleaks
+          rm gitleaks.tar.gz
+      - name: Scan git history
+        run: |
+          "$RUNNER_TEMP/gitleaks" git . --redact --no-banner --verbose --exit-code 1 \
+            --report-format json --report-path "$RUNNER_TEMP/gitleaks.json" 2>&1 | tee "$RUNNER_TEMP/gitleaks.log"
+          # gitleaks exits 0 when git fails and nothing is scanned; treat that as a failure.
+          if grep -Eq '(^|[^0-9])0 commits scanned' "$RUNNER_TEMP/gitleaks.log"; then
+            echo "::error::gitleaks scanned no commits"
+            exit 1
+          fi

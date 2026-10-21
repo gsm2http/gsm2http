@@ -1,0 +1,55 @@
+# gsm2http as a systemd service (bare metal).
+#
+# Assumes the repository is at /opt/gsm2http, built with scripts/build.sh,
+# and a system user exists:
+#   sudo useradd --system --home-dir /opt/gsm2http --shell /usr/sbin/nologin \
+#        --groups dialout gsm2http
+# Configuration lives in /opt/gsm2http/.env (copy .env.example).
+#
+#   sudo cp deploy/systemd/gsm2http.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now gsm2http
+#   journalctl -u gsm2http -f
+
+[Unit]
+Description=gsm2http - HTTP gateway for USB cellular modems
+Documentation=file:/opt/gsm2http/docs/DEPLOYMENT.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=gsm2http
+Group=gsm2http
+SupplementaryGroups=dialout
+WorkingDirectory=/opt/gsm2http
+Environment=NODE_ENV=production
+Environment=STATIC_DIR=/opt/gsm2http/frontend/dist
+# /usr/bin/env finds node in /usr/bin (distro, NodeSource) or /usr/local/bin
+ExecStart=/usr/bin/env node backend/dist/index.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+
+# Only USB serial (ttyUSB) and CDC-ACM (ttyACM) devices, plus the basics
+DevicePolicy=closed
+DeviceAllow=char-ttyUSB rw
+DeviceAllow=char-ttyACM rw
+
+# Hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+CapabilityBoundingSet=
+MemoryMax=256M
+
+[Install]
+WantedBy=multi-user.target

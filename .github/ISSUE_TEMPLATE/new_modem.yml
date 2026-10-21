@@ -1,0 +1,112 @@
+name: New modem support / hardware report
+description: Tell us how a modem works (or doesn't) with gsm2http
+title: "[Hardware] <Manufacturer> <Model>"
+labels: [hardware, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Reports help even when the modem **doesn't** work: they keep the hardware table honest.
+        See [docs/ADDING_A_MODEM.md](https://github.com/gsm2http/gsm2http/blob/main/docs/ADDING_A_MODEM.md) for how to capture an AT log.
+        **Remove** the IMEI/ICCID, phone numbers, message text and PDU hex before posting.
+  - type: input
+    id: model
+    attributes:
+      label: Manufacturer and model
+      description: From the label and from `AT+CGMI` / `AT+CGMM`.
+      placeholder: Huawei E3372h-153
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: Firmware revision
+      description: Output of `AT+CGMR`.
+      placeholder: 22.200.15.00.00
+    validations:
+      required: true
+  - type: input
+    id: usb-id
+    attributes:
+      label: USB vendor:product ID
+      description: From `lsusb`, after any mode switch.
+      placeholder: 12d1:1506
+  - type: dropdown
+    id: mode
+    attributes:
+      label: USB mode
+      options:
+        - Stick / serial out of the box
+        - HiLink, switched to serial (describe how below)
+        - HiLink only, couldn't switch
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: ports
+    attributes:
+      label: Serial ports
+      description: Output of `ls /dev/serial/by-id/`, and which one answered AT commands.
+  - type: input
+    id: network
+    attributes:
+      label: Network and country
+      description: Network type in use, and the country (no carrier account details).
+      placeholder: 3G (UMTS), Germany
+  - type: dropdown
+    id: detected
+    attributes:
+      label: Detected by gsm2http?
+      options: ["Yes", "No", "Partly (e.g. no model or IMEI)"]
+    validations:
+      required: true
+  - type: dropdown
+    id: sms-in
+    attributes:
+      label: Receiving SMS
+      options: ["Works", "Works, but long or emoji messages are broken", "Doesn't work", "Not tested"]
+    validations:
+      required: true
+  - type: dropdown
+    id: sms-out
+    attributes:
+      label: Sending SMS
+      options: ["Works", "Doesn't work", "Not tested / not available in my version"]
+  - type: dropdown
+    id: call-in
+    attributes:
+      label: Incoming call detection (caller ID)
+      options: ["Works", "Doesn't work", "Not tested"]
+  - type: dropdown
+    id: dial
+    attributes:
+      label: Dial / hang up
+      options: ["Works", "Doesn't work", "Modem has no voice support", "Not tested"]
+  - type: input
+    id: version
+    attributes:
+      label: gsm2http version
+      placeholder: v0.1.0 or commit SHA
+    validations:
+      required: true
+  - type: textarea
+    id: at-log
+    attributes:
+      label: AT log
+      description: Start-up plus one test of each feature you tried. `ATI`, `AT+CNMI=?` and `AT^CVOICE?` output is especially useful. **Anonymise first.**
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Mode-switch steps, power or hub needs, quirks, anything that surprised you.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I removed the IMEI/ICCID, phone numbers, message text and PDU hex from the log.
+          required: true
+        - label: I'm happy for this modem to be listed in the README's hardware table with these results.
