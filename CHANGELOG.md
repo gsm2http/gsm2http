@@ -4,6 +4,18 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Before `1.0.0`, any minor release may contain breaking changes.
 
+## [0.1.0](https://github.com/gsm2http/gsm2http/compare/v0.1.0-alpha.0...v0.1.0) (2026-10-21)
+
+
+### Added
+
+* initial release of gsm2http ([fb0e2c0](https://github.com/gsm2http/gsm2http/commit/fb0e2c0d94975feaee517d8e16dc4c5f7f00ac56))
+
+
+### Fixed
+
+* **ci:** target Node 22+ and add actions:read permission for CodeQL ([062296e](https://github.com/gsm2http/gsm2http/commit/062296eb57708b76d5ce83845dd75f243bdfc1ea))
+
 ## [Unreleased]
 
 First public release of gsm2http, the open-source edition of a private USB-modem gateway.
