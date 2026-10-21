@@ -1,6 +1,6 @@
 {
   "name": "@gsm2http/backend",
-  "version": "0.1.0-alpha.0",
+  "version": "0.1.0",
   "private": true,
   "description": "gsm2http server: REST API, Socket.io stream and webhooks for USB GSM/3G/LTE modems",
   "license": "Apache-2.0",
