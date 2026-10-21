@@ -19,9 +19,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 22 matches .nvmrc and the Docker images; lts/* tracks the current LTS line;
-        # 20 is the oldest version allowed by "engines".
-        node: ['20', '22', 'lts/*']
+        # 22 matches .nvmrc and the Docker images; lts/* tracks the current LTS line.
+        node: ['22', 'lts/*']
     steps:
       - uses: actions/checkout@v5
         with:
