@@ -1,0 +1,103 @@
+name: Bug report
+description: Something doesn't work as documented
+labels: [bug, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! **Before you paste logs, remove** phone numbers, IMEI/ICCID, message text, PDU hex strings, webhook URLs, IP addresses and hostnames. Replace them with `XXXX`.
+        Security problems → please use the Security tab instead (see SECURITY.md).
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start with MOCK_MODE=false and one E173 on /dev/ttyUSB0
+        2. curl -X POST …/api/modems/modem-1/dial -d '{"to":"+12025550199"}'
+        3. …
+    validations:
+      required: true
+  - type: dropdown
+    id: mock
+    attributes:
+      label: Does it reproduce in mock mode?
+      options:
+        - "Yes"
+        - "No, only with real hardware"
+        - "Didn't try"
+    validations:
+      required: true
+  - type: input
+    id: modem-model
+    attributes:
+      label: Modem model
+      description: As reported by `AT+CGMM` or shown in the UI. Write "n/a (mock mode)" if not relevant.
+      placeholder: Huawei E3372
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: Modem firmware version
+      description: Output of `AT+CGMR` (or `ATI`).
+      placeholder: 21.180.01.00.00
+  - type: dropdown
+    id: usb-mode
+    attributes:
+      label: USB mode
+      options:
+        - Stick / serial (ttyUSB ports visible)
+        - HiLink (network interface, web UI)
+        - Not sure
+        - n/a (mock mode)
+  - type: input
+    id: version
+    attributes:
+      label: gsm2http version
+      description: Image tag or commit SHA.
+      placeholder: v0.1.0 / ghcr.io/…:latest pulled 2026-10-14 / abc1234
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: How do you run it?
+      options:
+        - Docker Compose
+        - Docker (other)
+        - Bare metal / systemd
+        - Development (npm run dev:backend)
+    validations:
+      required: true
+  - type: input
+    id: host
+    attributes:
+      label: Host
+      placeholder: Raspberry Pi 4, Raspberry Pi OS 64-bit, Docker 27; or x86_64 Debian 13
+  - type: textarea
+    id: at-log
+    attributes:
+      label: AT log
+      description: |
+        From the UI's AT log panel or `docker compose logs gsm2http`, covering the moment it went wrong. **Anonymise first.**
+      render: text
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: API responses, webhook payloads (anonymised), screenshots.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I removed phone numbers, IMEI/ICCID, message text and PDUs from the logs above.
+          required: true
+        - label: No other program (ModemManager, gammu-smsd, Asterisk) is using the modem's ports.

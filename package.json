@@ -1,0 +1,36 @@
+{
+  "name": "gsm2http",
+  "version": "0.1.0-alpha.0",
+  "private": true,
+  "description": "Self-hosted SMS and call-control gateway that exposes USB GSM/3G/LTE modems over HTTP: REST API in, webhooks out.",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/gsm2http/gsm2http#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gsm2http/gsm2http.git"
+  },
+  "bugs": {
+    "url": "https://github.com/gsm2http/gsm2http/issues"
+  },
+  "engines": {
+    "node": ">=20.19"
+  },
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev --workspace backend",
+    "dev:frontend": "npm run dev --workspace frontend",
+    "build": "npm run build --workspaces",
+    "test": "npm test --workspace backend",
+    "lint": "npm run lint --workspaces",
+    "typecheck": "npm run typecheck --workspaces",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm test"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.10"
+  }
+}

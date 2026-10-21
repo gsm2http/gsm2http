@@ -1,0 +1,892 @@
+openapi: 3.1.0
+info:
+  title: gsm2http API
+  version: 0.1.0-alpha
+  summary: REST in, webhooks out, for USB GSM/3G/LTE modems.
+  description: |
+    gsm2http exposes USB modems that speak AT commands over HTTP.
+
+    - **REST in:** the endpoints below.
+    - **Events out:** see `webhooks` (`sms.received`, `sms.sent`, `call.incoming`, `call.ended`,
+      `modem.added`, `modem.removed`, `modem.status`) and [events.md](events.md). The same
+      versioned envelope goes to webhooks, MQTT and Socket.io.
+    - **Socket.io:** the same events, streamed live. See `x-socketio` at the end of this file.
+
+    **Status markers.** Operations and fields tagged `x-status: planned` are designed but not
+    yet implemented. They are scheduled for `v0.1.0`.
+
+    **Addressing a modem.** The `{modemId}` path parameter matches, in this order: the modem
+    ID (`modem-1`), the full serial port path or its end (`ttyUSB0`), the IMEI, part of the
+    model name (`e173`), or the phone number (digits only are compared).
+
+    **Authentication.** Every `/api/` route needs `Authorization: Bearer <API_TOKEN>`.
+    `/healthz` is public. After 20 wrong tokens in 5 minutes, further wrong tokens from that
+    client address get 429 for the rest of the window; the correct token is always accepted.
+
+    **Errors.** Every failure returns a non-2xx status with `{ "success": false, "error": "…" }`.
+    Request bodies are validated strictly: a field of the wrong type is a 400, not ignored.
+    Bodies over 32 KB are rejected with 413. Error responses never include stack traces.
+
+    **Rate limits.** Sending SMS, dialling and unlocking are limited per modem
+    (`SMS_MIN_INTERVAL_MS`, `SMS_DAILY_LIMIT`, `CALLS_HOURLY_LIMIT`, `UNLOCK_HOURLY_LIMIT`).
+    Over a limit, the response is 429 with a `Retry-After` header and `retryAfterSeconds`.
+
+    "Twilio" is a trademark of Twilio Inc. gsm2http is not affiliated with Twilio Inc.
+  license:
+    name: Apache-2.0
+    identifier: Apache-2.0
+servers:
+  - url: http://127.0.0.1:9333
+    description: Default local instance
+security:
+  - bearerAuth: []
+tags:
+  - name: modems
+    description: Discover and inspect modems
+  - name: messaging
+    description: SMS
+  - name: voice
+    description: Call control (no audio)
+  - name: sim
+    description: SIM and network management
+  - name: config
+    description: Runtime configuration
+  - name: mock
+    description: Simulation endpoints, available only when `MOCK_MODE=true`
+
+paths:
+  /api/modems:
+    get:
+      tags: [modems]
+      operationId: listModems
+      summary: List connected modems
+      responses:
+        '200':
+          description: Current modems
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [modems]
+                properties:
+                  modems:
+                    type: array
+                    items: { $ref: '#/components/schemas/Modem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/modems/scan:
+    post:
+      tags: [modems]
+      operationId: scanModems
+      summary: Rescan serial ports now
+      description: |
+        Ports are scanned automatically every 15 seconds. Use this to pick up a modem you just
+        plugged in without waiting. In mock mode it returns the mock modems.
+      responses:
+        '200':
+          description: Scan finished
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, const: true }
+                  modems:
+                    type: array
+                    items: { $ref: '#/components/schemas/Modem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/ServerError' }
+
+  /api/modems/{modemId}/sms:
+    post:
+      tags: [messaging]
+      operationId: sendSms
+      summary: Send an SMS
+      description: |
+        Sends one SMS to one recipient and responds once the modem has accepted every part.
+        Text longer than one segment is split into concatenated parts automatically
+        (160 GSM-7 or 70 UCS-2 characters per single message; 153 or 67 per part when split).
+
+        `to` must be `+` and digits after removing spaces, dots, dashes and parentheses. `text`
+        may contain line breaks but no other control characters. `SMS_MIN_INTERVAL_MS` and
+        `SMS_DAILY_LIMIT` apply per modem.
+
+        (Planned:) the destination must match `ALLOWED_PREFIXES`, and an `Idempotency-Key`
+        header prevents duplicate sends.
+      parameters:
+        - $ref: '#/components/parameters/ModemId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to, text]
+              properties:
+                to:
+                  type: string
+                  description: Destination in E.164 format. Spaces, dashes and parentheses are ignored.
+                  examples: ['+12025550199']
+                text:
+                  type: string
+                  maxLength: 1530
+                  examples: ['Backup finished: 0 errors']
+      responses:
+        '200':
+          description: Every part was accepted by the modem
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, const: true }
+                  modemId: { type: string }
+                  from: { type: string, description: "The modem's phone number, or its ID if unknown" }
+                  to: { type: string }
+                  parts: { type: integer, minimum: 1 }
+                  messageReferences:
+                    type: array
+                    description: TP-Message-Reference of each part, as reported by `+CMGS`
+                    items: { type: integer, minimum: 0, maximum: 255 }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ModemNotFound' }
+        '409':
+          description: The modem's SIM is not ready (for example, it still needs a PIN)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '502':
+          description: The modem or network rejected the message
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/modems/{modemId}/dial:
+    post:
+      tags: [voice]
+      operationId: dial
+      summary: Place a call, then hang up after a duration
+      description: |
+        Dials `to`, keeps the call up for the requested duration (minimum 500 ms, default
+        `DEFAULT_CALL_DURATION_MS`), then hangs up. The call ends earlier if the network reports
+        `BUSY`, `NO ANSWER`, `NO CARRIER` or `^CEND`. There is no audio: this is meant for
+        "ring my phone" alerts.
+
+        By default the response returns as soon as the call starts. Set `sync: true` to wait
+        until it has ended.
+
+        The modem must support voice (`supportsVoice: true`). `CALLS_HOURLY_LIMIT` applies per
+        modem. (Planned:) the destination must match `ALLOWED_PREFIXES`.
+      parameters:
+        - $ref: '#/components/parameters/ModemId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to]
+              properties:
+                to:
+                  type: string
+                  description: |
+                    Number to call: an optional `+` and 3 to 20 digits. Spaces, dashes and
+                    parentheses are removed first.
+                  examples: ['+12025550199']
+                durationMs:
+                  type: integer
+                  minimum: 500
+                  description: Call length in milliseconds. Takes precedence over `durationSeconds`.
+                durationSeconds:
+                  type: number
+                  exclusiveMinimum: 0
+                  description: Call length in seconds.
+                sync:
+                  type: boolean
+                  default: false
+                  description: Wait until the call has ended before responding.
+                force:
+                  type: boolean
+                  default: false
+                  description: If the modem is already on a call, hang it up and dial this one instead of returning 409.
+      responses:
+        '200':
+          description: Call placed (or completed, when `sync` is true)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DialResult' }
+        '400':
+          description: Missing destination, or the modem does not support voice
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ModemNotFound' }
+        '409':
+          description: The modem is already on a call and `force` was not set
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - type: object
+                    properties:
+                      busy: { type: boolean, const: true }
+                      modemId: { type: string }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /api/modems/{modemId}/hangup:
+    post:
+      tags: [voice]
+      operationId: hangup
+      summary: Hang up the current call
+      parameters:
+        - $ref: '#/components/parameters/ModemId'
+      responses:
+        '200':
+          description: Hang-up command sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, const: true }
+                  message: { type: string }
+                  modemId: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ModemNotFound' }
+
+  /api/modems/{modemId}/unlock:
+    post:
+      tags: [sim]
+      operationId: unlockSim
+      summary: Unlock the SIM with its PIN
+      description: |
+        Sends `AT+CPIN`. **Three wrong PINs lock the SIM**, and then you need the PUK from your
+        carrier. gsm2http never retries a rejected PIN on its own. The PIN is never logged or
+        returned.
+
+        Before sending, gsm2http asks the modem how many PIN attempts are left (`AT+CPINR`, or
+        `AT^CPIN?` on Huawei) and answers 409 instead of trying when only one is left, so the
+        API can never PUK-lock the SIM. If the modem cannot report the count, one wrong PIN
+        blocks further attempts until gsm2http restarts. `UNLOCK_HOURLY_LIMIT` applies too.
+      parameters:
+        - $ref: '#/components/parameters/ModemId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pin]
+              properties:
+                pin:
+                  type: string
+                  pattern: '^[0-9]{4,8}$'
+                  writeOnly: true
+      responses:
+        '200':
+          description: PIN accepted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ok' }
+        '400':
+          description: PIN missing or rejected by the SIM
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ModemNotFound' }
+        '409':
+          description: |
+            Refused to protect the SIM: it is PUK-locked, has one PIN attempt left, or already
+            rejected a PIN and cannot report how many attempts remain.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: '#/components/schemas/Error' }
+                  - type: object
+                    properties:
+                      pinAttemptsLeft: { type: [integer, 'null'] }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/ServerError' }
+
+  /api/modems/{modemId}/query:
+    post:
+      tags: [sim]
+      operationId: queryModem
+      summary: Refresh diagnostics and check for unread SMS
+      description: |
+        Re-reads SIM status, signal, network registration and operator. If the SIM is ready,
+        it also checks SIM storage for unread messages. Results arrive as a `modem.status`
+        event and in the raw AT log; the response only confirms the queries were sent.
+      parameters:
+        - $ref: '#/components/parameters/ModemId'
+      responses:
+        '200':
+          description: Queries sent
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ModemNotFound' }
+        '500': { $ref: '#/components/responses/ServerError' }
+
+  /api/modems/{modemId}/network:
+    post:
+      tags: [sim]
+      operationId: setNetworkMode
+      summary: Set the preferred radio access technology
+      description: |
+        `auto` lets the modem choose, including LTE on modems that support it. Voice calls on
+        3G-era sticks often work only in `2g` or `3g`. Uses `AT^SYSCFGEX`, falling back to
+        `AT^SYSCFG` on older modems.
+      parameters:
+        - $ref: '#/components/parameters/ModemId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type]
+              properties:
+                type:
+                  type: string
+                  enum: ['2g', '3g', auto]
+      responses:
+        '200':
+          description: Mode changed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ok' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ModemNotFound' }
+        '500': { $ref: '#/components/responses/ServerError' }
+
+  /api/config:
+    get:
+      tags: [config]
+      operationId: getConfig
+      summary: Read the runtime configuration
+      responses:
+        '200':
+          description: Current configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mockMode: { type: boolean }
+                  authEnabled: { type: boolean }
+                  defaultCallDurationMs: { type: integer }
+                  notifierCount:
+                    type: integer
+                    description: Configured webhook and MQTT sinks. See `/api/notifiers`.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/notifiers:
+    get:
+      tags: [config]
+      operationId: listNotifiers
+      summary: Configured webhook and MQTT sinks, and recent delivery attempts
+      description: |
+        Read-only. Sinks come from `CONFIG_FILE` and the `WEBHOOK_*` / `MQTT_*` environment
+        variables; there is deliberately no API to change them. Targets are shown as origins
+        only (no path, query or credentials), and delivery records never contain payloads.
+      responses:
+        '200':
+          description: Sinks and the last 100 delivery attempts, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [notifiers, deliveries]
+                properties:
+                  notifiers:
+                    type: array
+                    items: { $ref: '#/components/schemas/NotifierSummary' }
+                  deliveries:
+                    type: array
+                    items: { $ref: '#/components/schemas/DeliveryRecord' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/mock/sms:
+    post:
+      tags: [mock]
+      operationId: mockSms
+      summary: Simulate an incoming SMS
+      description: |
+        Injects a `+CMTI` notification into a mock modem, which then follows the real receive
+        path: read PDU → decode → reassemble → `sms.received`. Give either `text`, a single
+        `pdu`, an array of `pdus`, or a predefined `testCase`. Only mounted when `MOCK_MODE=true`;
+        otherwise the route does not exist (404).
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                modemId: { type: string, default: first modem }
+                sender: { type: string, default: '+12025550199' }
+                text:
+                  type: string
+                  description: Split into a concatenated SMS automatically when it exceeds one segment
+                multipart:
+                  type: boolean
+                  description: Force multipart encoding
+                pdu:
+                  type: string
+                  description: One SMS-DELIVER PDU as hex
+                pdus:
+                  type: array
+                  items: { type: string }
+                  description: Several SMS-DELIVER PDUs as hex, delivered 40 ms apart
+                testCase:
+                  type: string
+                  enum: [multipart-ucs2]
+                  description: A built-in four-part UCS-2 message, used to test reassembly
+      responses:
+        '200':
+          description: Injected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, const: true }
+                  modemId: { type: string }
+                  parts: { type: integer, description: Number of SMS-DELIVER PDUs injected }
+                  injectedIndices:
+                    type: array
+                    items: { type: string }
+                    description: The mock SIM slots the parts were stored in
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404':
+          description: Not in mock mode, or no modem matched `modemId`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/mock/call:
+    post:
+      tags: [mock]
+      operationId: mockCall
+      summary: Simulate an incoming call
+      description: Injects `RING` and `+CLIP` into a mock modem. Only mounted when `MOCK_MODE=true`.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                modemId: { type: string, default: first modem }
+                number: { type: string, default: '+12025550188' }
+      responses:
+        '200':
+          description: Injected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, const: true }
+                  modemId: { type: string }
+                  injectedCaller: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404':
+          description: Not in mock mode, or no modem matched `modemId`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+webhooks:
+  sms.received:
+    post:
+      operationId: onSmsReceived
+      summary: An SMS arrived (multipart messages already reassembled)
+      parameters: &deliveryHeaders
+        - { name: X-Gsm2http-Event, in: header, required: true, schema: { type: string }, description: Same as the body's `event` }
+        - { name: X-Gsm2http-Delivery, in: header, required: true, schema: { type: string }, description: Same as the body's `id`; unchanged across retries }
+        - { name: X-Gsm2http-Attempt, in: header, required: true, schema: { type: integer, minimum: 1 } }
+        - { name: X-Gsm2http-Timestamp, in: header, schema: { type: integer }, description: 'When signed: Unix seconds at signing' }
+        - name: X-Gsm2http-Signature
+          in: header
+          schema: { type: string, pattern: '^sha256=[0-9a-f]{64}$' }
+          description: 'When signed: `sha256=` + hex HMAC-SHA256(secret, "<timestamp>.<raw body>"). See events.md#signatures.'
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SmsReceivedEvent' }
+      responses: &ack
+        '2XX':
+          description: Delivered. Timeouts, 408, 425, 429 and 5xx are retried with backoff; other responses are not.
+  sms.sent:
+    post:
+      operationId: onSmsSent
+      summary: The network accepted an SMS sent with `POST /api/modems/{modemId}/sms`
+      parameters: *deliveryHeaders
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SmsSentEvent' }
+      responses: *ack
+  call.incoming:
+    post:
+      operationId: onCallIncoming
+      summary: A call started ringing (sent once per call, not per ring)
+      parameters: *deliveryHeaders
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CallIncomingEvent' }
+      responses: *ack
+  call.ended:
+    post:
+      operationId: onCallEnded
+      summary: An incoming call stopped ringing, or an outgoing call is over
+      parameters: *deliveryHeaders
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CallEndedEvent' }
+      responses: *ack
+  modem.added:
+    post:
+      operationId: onModemAdded
+      summary: A modem was detected (also sent for each modem present at startup)
+      parameters: *deliveryHeaders
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ModemEvent' }
+      responses: *ack
+  modem.removed:
+    post:
+      operationId: onModemRemoved
+      summary: A modem was unplugged or stopped responding (`data.connected` is false)
+      parameters: *deliveryHeaders
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ModemEvent' }
+      responses: *ack
+  modem.status:
+    post:
+      operationId: onModemStatus
+      summary: A modem's state changed. Not sent to webhooks unless their filter includes it; rate-limited per modem.
+      parameters: *deliveryHeaders
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ModemEvent' }
+      responses: *ack
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: The value of `API_TOKEN` (at least 32 characters). gsm2http refuses to start without one unless `AUTH_DISABLED=true`.
+
+  parameters:
+    ModemId:
+      name: modemId
+      in: path
+      required: true
+      description: Modem ID, port path or its end, IMEI, model substring, or phone number
+      schema: { type: string }
+      examples:
+        id: { value: modem-1 }
+        port: { value: ttyUSB0 }
+        model: { value: e173 }
+
+  responses:
+    Unauthorized:
+      description: Missing or wrong bearer token
+      headers:
+        WWW-Authenticate:
+          schema: { type: string, const: Bearer }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    TooManyRequests:
+      description: A per-modem rate limit was reached, or too many wrong tokens from this address
+      headers:
+        Retry-After:
+          description: Seconds until the request may be retried
+          schema: { type: integer }
+      content:
+        application/json:
+          schema:
+            allOf:
+              - { $ref: '#/components/schemas/Error' }
+              - type: object
+                properties:
+                  retryAfterSeconds: { type: integer }
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ModemNotFound:
+      description: No modem matched `modemId`
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ServerError:
+      description: The modem returned an error or timed out
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Ok:
+      type: object
+      properties:
+        success: { type: boolean, const: true }
+        message: { type: string }
+
+    Error:
+      type: object
+      required: [success, error]
+      properties:
+        success: { type: boolean, const: false }
+        error: { type: string }
+
+    SimStatus:
+      type: string
+      enum: [READY, SIM PIN, SIM PUK, NO SIM, ERROR, UNKNOWN]
+
+    Modem:
+      type: object
+      required: [id, port, name, model, manufacturer, imei, driver, capabilities, simStatus, supportsVoice, connected, networkMode]
+      properties:
+        id: { type: string, examples: [modem-1] }
+        port: { type: string, examples: [/dev/ttyUSB0] }
+        name: { type: string, examples: ['Huawei E173 (/dev/ttyUSB0)'] }
+        model: { type: string, examples: [E173] }
+        manufacturer: { type: string, examples: [Huawei] }
+        imei: { type: string, examples: ['000000000000001'] }
+        revision: { type: string, description: Firmware revision from `AT+CGMR` }
+        driver:
+          type: string
+          description: The driver handling this modem. See docs/ADDING_A_MODEM.md.
+          examples: [huawei, generic]
+        capabilities:
+          type: object
+          required: [sms, voice, ussd, audio]
+          properties:
+            sms: { type: boolean }
+            voice: { type: boolean, description: Can place and receive voice calls }
+            ussd: { type: boolean }
+            audio: { type: boolean, description: Exposes call audio to the host (not used by gsm2http yet) }
+        simStatus: { $ref: '#/components/schemas/SimStatus' }
+        phoneNumber:
+          type: string
+          description: From `MODEM_NUMBERS`. Most SIMs don't report their own number.
+        operator: { type: string, examples: [Example Mobile] }
+        signalStrength:
+          type: integer
+          description: Raw `+CSQ` RSSI, 0–31, or 99 for unknown
+        signalPercentage: { type: integer, minimum: 0, maximum: 100 }
+        accessTechnology:
+          type: string
+          description: Radio access technology in use, as reported by the modem
+          examples: [GSM, WCDMA, LTE]
+        supportsVoice: { type: boolean }
+        connected: { type: boolean }
+        networkMode: { type: string, examples: ['2g', '3g', auto] }
+        isDialing: { type: boolean }
+
+    DialResult:
+      type: object
+      properties:
+        success: { type: boolean, const: true }
+        completed:
+          type: boolean
+          description: True when `sync` was requested and the call has ended
+        message: { type: string }
+        callId:
+          type: string
+          description: Matches the `callId` of the `call.ended` event this call produces
+          examples: [call_d599673bf2ab43e3b62edd9933ecf9b6]
+        durationMs: { type: integer }
+        from: { type: string, description: "The modem's phone number, or its ID if unknown" }
+        to: { type: string }
+        modemId: { type: string }
+        modemPort: { type: string }
+
+    ModemRef:
+      type: object
+      required: [id, port]
+      properties:
+        id: { type: string, description: Discovery-order ID; may change after a restart, examples: [modem-1] }
+        port: { type: string, examples: [/dev/ttyUSB0] }
+        imei: { type: string, description: The stable key for a modem, examples: ['000000000000001'] }
+        phoneNumber: { type: string, description: From `MODEM_NUMBERS` }
+
+    EventEnvelope:
+      type: object
+      description: |
+        Schema version 1. New events and optional fields may be added without a version
+        change; ignore what you don't know. See events.md#versioning.
+      required: [schemaVersion, id, event, timestamp, modem, data]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        id:
+          type: string
+          pattern: '^evt_[0-9a-f]{32}$'
+          description: Unique per event; the same across retries and sinks. De-duplicate on it.
+        event:
+          type: string
+          enum: [sms.received, sms.sent, call.incoming, call.ended, modem.added, modem.removed, modem.status]
+        timestamp: { type: string, format: date-time, description: When gsm2http observed the event }
+        modem: { $ref: '#/components/schemas/ModemRef' }
+        data: { type: object }
+
+    SmsReceivedEvent:
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            event: { const: sms.received }
+            data:
+              type: object
+              required: [sender, text, sentAt]
+              properties:
+                sender: { type: string, description: 'Phone number, or an alphanumeric sender ID such as "BANK"' }
+                recipientNumber: { type: string, description: "The receiving SIM's number, if set in `MODEM_NUMBERS`" }
+                text: { type: string }
+                sentAt: { type: string, format: date-time, description: When the SMS centre accepted the message }
+      examples:
+        - schemaVersion: 1
+          id: evt_8f14e45fceea167a5a36dedd4bea2543
+          event: sms.received
+          timestamp: '2026-10-14T19:04:12.204Z'
+          modem: { id: modem-1, port: /dev/ttyUSB0, imei: '000000000000001', phoneNumber: '+12025550143' }
+          data:
+            sender: '+12025550199'
+            recipientNumber: '+12025550143'
+            text: Garage door opened at 21:04
+            sentAt: '2026-10-14T19:04:10.000Z'
+
+    SmsSentEvent:
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            event: { const: sms.sent }
+            data:
+              type: object
+              required: [to, text, parts, messageReferences]
+              properties:
+                to: { type: string }
+                from: { type: string, description: "The sending SIM's number, if set in `MODEM_NUMBERS`" }
+                text: { type: string }
+                parts: { type: integer, minimum: 1 }
+                messageReferences: { type: array, items: { type: integer } }
+
+    CallIncomingEvent:
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            event: { const: call.incoming }
+            data:
+              type: object
+              required: [callId, direction, number]
+              properties:
+                callId: { type: string }
+                direction: { const: inbound }
+                number: { type: string, description: Caller ID from `+CLIP`. Empty if the caller withheld it. }
+                recipientNumber: { type: string }
+
+    CallEndedEvent:
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            event: { const: call.ended }
+            data:
+              type: object
+              required: [callId, direction, number, reason, startedAt, durationMs]
+              properties:
+                callId: { type: string, description: 'Matches `call.incoming`, or the `callId` returned by `/dial`' }
+                direction: { type: string, enum: [inbound, outbound] }
+                number: { type: string }
+                reason:
+                  type: string
+                  enum: [missed, completed, hangup, remote_hangup, busy, no_answer, failed, replaced, modem_closed]
+                startedAt: { type: string, format: date-time }
+                durationMs: { type: integer, minimum: 0 }
+                rings: { type: integer, description: Inbound only }
+                detail: { type: string, description: 'The modem''s result line when the network ended the call, e.g. `NO CARRIER`' }
+
+    ModemEvent:
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            event: { enum: [modem.added, modem.removed, modem.status] }
+            data: { $ref: '#/components/schemas/Modem' }
+
+    NotifierSummary:
+      type: object
+      required: [name, type, target, events, stats]
+      properties:
+        name: { type: string, examples: [n8n] }
+        type: { type: string, enum: [webhook, mqtt] }
+        target: { type: string, description: Origin only, examples: ['https://n8n.example/…'] }
+        events: { type: array, items: { type: string }, examples: [['sms.*', 'call.*']] }
+        modems: { type: array, items: { type: string } }
+        signed: { type: boolean, description: Webhooks only }
+        connected: { type: boolean, description: MQTT only }
+        stats:
+          type: object
+          required: [delivered, failed, pending]
+          properties:
+            delivered: { type: integer }
+            failed: { type: integer, description: Deliveries given up on }
+            pending: { type: integer, description: In flight or waiting for a retry }
+            lastSuccessAt: { type: string, format: date-time }
+            lastFailureAt: { type: string, format: date-time }
+            lastError: { type: string }
+
+    DeliveryRecord:
+      type: object
+      required: [notifier, eventId, event, attempt, outcome, at]
+      properties:
+        notifier: { type: string }
+        eventId: { type: string }
+        event: { type: string }
+        attempt: { type: integer }
+        outcome: { type: string, enum: [delivered, retrying, failed, dropped] }
+        at: { type: string, format: date-time }
+        durationMs: { type: integer }
+        status: { type: integer, description: 'HTTP status, for webhooks that got a response' }
+        error: { type: string }
+        retryAt: { type: string, format: date-time }
+
+x-socketio:
+  description: |
+    Socket.io (v4) runs on the same port as the API, at the default path `/socket.io`.
+    Clients must authenticate with `io(url, { auth: { token: API_TOKEN } })`; otherwise the
+    connection fails with a `connect_error` whose message is `unauthorized` (or `rate_limited`
+    after too many wrong tokens).
+    Every event is server → client. Each webhook event is emitted under its own name with
+    the same envelope and `id`; `modem.status` is not rate-limited here.
+  events:
+    - name: sms.received / sms.sent / call.incoming / call.ended / modem.added / modem.removed / modem.status
+      payload: The event envelope (see `webhooks`)
+      when: As for webhooks
+    - name: modems.list
+      payload: 'Modem[] (the full list)'
+      when: Once on connect, and after every modem.added or modem.removed
+    - name: modem.raw
+      payload: '{ id, modemId, modemPort, modemName, event, timestamp }, where event is one raw AT line or a [System …] note'
+      when: Every line read from or written to a modem. Used by the UI's AT log. May include phone numbers and message content, so it is never sent to webhooks or MQTT.

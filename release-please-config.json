@@ -1,0 +1,37 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "f1affc2fa3ea08fc25e581cb3e85510fab7fb88e",
+  "include-component-in-tag": false,
+  "include-v-in-tag": true,
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": false,
+  "packages": {
+    ".": {
+      "release-type": "node",
+      "package-name": "gsm2http",
+      "release-as": "0.1.0",
+      "changelog-path": "CHANGELOG.md",
+      "changelog-sections": [
+        { "type": "feat", "section": "Added" },
+        { "type": "fix", "section": "Fixed" },
+        { "type": "perf", "section": "Changed" },
+        { "type": "refactor", "section": "Changed" },
+        { "type": "revert", "section": "Reverted" },
+        { "type": "deps", "section": "Dependencies" },
+        { "type": "docs", "section": "Documentation", "hidden": true },
+        { "type": "security", "section": "Security" },
+        { "type": "chore", "section": "Miscellaneous", "hidden": true },
+        { "type": "ci", "section": "CI", "hidden": true },
+        { "type": "build", "section": "Build", "hidden": true },
+        { "type": "test", "section": "Tests", "hidden": true },
+        { "type": "style", "section": "Style", "hidden": true }
+      ],
+      "extra-files": [
+        { "type": "json", "path": "backend/package.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "frontend/package.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "package-lock.json", "jsonpath": "$.packages.backend.version" },
+        { "type": "json", "path": "package-lock.json", "jsonpath": "$.packages.frontend.version" }
+      ]
+    }
+  }
+}

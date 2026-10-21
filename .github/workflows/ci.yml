@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    name: Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 22 matches .nvmrc and the Docker images; lts/* tracks the current LTS line;
+        # 20 is the oldest version allowed by "engines".
+        node: ['20', '22', 'lts/*']
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - name: Install
+        run: npm ci --no-audit --no-fund
+      - name: Format
+        run: npm run format:check
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Backend tests
+        if: matrix.node != 'lts/*'
+        run: npm test
+      # Coverage for the parsers and modem drivers; thresholds live in backend/package.json.
+      - name: Backend tests with coverage
+        if: matrix.node == 'lts/*'
+        run: npm run test:coverage --workspace backend
+      - name: Upload coverage report
+        if: matrix.node == 'lts/*' && !cancelled()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov
+          path: backend/coverage/lcov.info
+          if-no-files-found: ignore
+      - name: Build backend and frontend
+        run: npm run build
