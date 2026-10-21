@@ -45,12 +45,12 @@ jobs:
           - image: gsm2http-web
             dockerfile: frontend/Dockerfile
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v6
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
         with:
           context: .
           file: ${{ matrix.dockerfile }}
@@ -69,7 +69,7 @@ jobs:
       id-token: write
       attestations: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || github.ref }}
           persist-credentials: false
@@ -81,7 +81,7 @@ jobs:
         run: |
           echo "image=ghcr.io/${OWNER,,}/gsm2http" >> "$GITHUB_OUTPUT"
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
-      - uses: docker/metadata-action@v5
+      - uses: docker/metadata-action@v6
         id: meta
         with:
           images: ${{ steps.vars.outputs.image }}
@@ -96,14 +96,14 @@ jobs:
             org.opencontainers.image.title=gsm2http
             org.opencontainers.image.description=Self-hosted SMS and call-control gateway for USB GSM/3G/LTE modems: REST API in, webhooks out.
             org.opencontainers.image.licenses=Apache-2.0
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         id: push
         with:
           context: .
@@ -117,7 +117,7 @@ jobs:
           sbom: true
           cache-from: type=gha,scope=gsm2http
           cache-to: type=gha,scope=gsm2http,mode=max
-      - uses: actions/attest-build-provenance@v3
+      - uses: actions/attest-build-provenance@v4
         with:
           subject-name: ${{ steps.vars.outputs.image }}
           subject-digest: ${{ steps.push.outputs.digest }}
