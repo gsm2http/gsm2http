@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Before `1.0.0`, any minor release may contain breaking changes.
 
+## [0.1.0](https://github.com/gsm2http/gsm2http/compare/v0.1.0...v0.1.0) (2026-10-21)
+
+
+### Added
+
+* initial release of gsm2http v0.1.0 ([187430e](https://github.com/gsm2http/gsm2http/commit/187430e3053f92cc7201a1852d87a71834c26363))
+
 ## [0.1.0] - 2026-10-21
 
 Initial public release of gsm2http.
