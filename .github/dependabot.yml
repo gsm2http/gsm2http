@@ -1,0 +1,44 @@
+version: 2
+
+updates:
+  # Root lockfile covers both workspaces (backend, frontend).
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    commit-message:
+      # "deps:" lands in the changelog and triggers a patch release; dev-only bumps don't.
+      prefix: deps
+      prefix-development: chore
+    groups:
+      npm-minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # @types/node follows the oldest Node line the backend runs on in Docker.
+      - dependency-name: '@types/node'
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: docker
+    directories: [/, /backend, /frontend]
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: deps
+    groups:
+      docker-base-images:
+        patterns: ['*']
+    ignore:
+      # Node 24+ has no official linux/arm/v7 images; stay on the 22 LTS line.
+      - dependency-name: node
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+    groups:
+      github-actions:
+        patterns: ['*']

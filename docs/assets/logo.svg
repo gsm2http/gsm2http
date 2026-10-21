@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Subtle gradient for background depth -->
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0e1322" />
+      <stop offset="100%" stop-color="#020408" />
+    </linearGradient>
+  </defs>
+
+  <!-- Full bleed square background: no empty angles/corners -->
+  <rect width="512" height="512" fill="url(#bg)" />
+
+  <!-- Monotype Stacked Text -->
+  <g font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', 'Fira Code', Menlo, Consolas, monospace" font-weight="800" text-anchor="middle">
+    <!-- Line 1: gsm (greyish) + 2 (cyan) -->
+    <text x="256" y="225" font-size="112" letter-spacing="-2">
+      <tspan fill="#94a3b8">gsm</tspan><tspan fill="#38bdf8">2</tspan>
+    </text>
+
+    <!-- Line 2: http (pure white) -->
+    <text x="256" y="342" font-size="112" letter-spacing="-2" fill="#ffffff">
+      http
+    </text>
+  </g>
+</svg>

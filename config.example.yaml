@@ -1,0 +1,56 @@
+# gsm2http notifier configuration. Copy to config.yaml, edit, and point CONFIG_FILE at it:
+#   CONFIG_FILE=./config.yaml            (bare metal)
+#   CONFIG_FILE=/config/config.yaml      (Docker; see the volume in docker-compose.yml)
+#
+# Everything here is optional. WEBHOOK_URL and MQTT_URL in .env add sinks of their own,
+# alongside the ones below. Full reference: docs/events.md#configuration
+#
+# ${NAME} is replaced with the environment variable NAME, so secrets can stay in .env.
+# ${NAME:-fallback} uses "fallback" when NAME is unset. Write $${ for a literal ${.
+
+events:
+  # At most one modem.status per modem per interval reaches webhooks and MQTT (the latest
+  # state wins). 0 sends every change. The web UI always gets every change.
+  modemStatusMinIntervalMs: 10000
+
+notifiers:
+  # An HTTP webhook, e.g. an n8n or Node-RED workflow.
+  - type: webhook
+    name: n8n
+    url: https://n8n.example/webhook/${N8N_WEBHOOK_ID}
+    # Exact names, families ("sms.*") or "*". Default: everything except modem.status.
+    events: [sms.received, call.incoming, call.ended]
+    # Only these modems (ID, IMEI or phone number). Default: all.
+    # modems: ['000000000000001']
+    # HMAC-SHA256 signing key. Defaults to WEBHOOK_SECRET; set "" to send unsigned.
+    secret: ${N8N_WEBHOOK_SECRET}
+    timeoutMs: 10000
+    retry:
+      maxAttempts: 6 # including the first; 1 disables retries
+      initialDelayMs: 10000
+      factor: 3 # 10 s, 30 s, 90 s, 4.5 min, 13.5 min
+      maxDelayMs: 1800000
+    # Extra request headers, e.g. for an authenticating proxy in front of the receiver.
+    # headers:
+    #   Authorization: Bearer ${PROXY_TOKEN}
+
+  # A second webhook with its own filter: only modem plug/unplug events.
+  # - type: webhook
+  #   name: ops-alerts
+  #   url: https://alerts.example/gsm2http
+  #   events: ['modem.added', 'modem.removed']
+
+  # MQTT, e.g. the Mosquitto add-on in Home Assistant.
+  # Topics: gsm2http/<modemId>/sms/received, …/call/incoming, …/modem/status (retained).
+  - type: mqtt
+    name: home-assistant
+    url: mqtt://homeassistant.local:1883 # mqtts://, ws:// and wss:// work too
+    username: gsm2http
+    password: ${MQTT_PASSWORD}
+    topicPrefix: gsm2http
+    events: ['*']
+    qos: 1
+    retainStatus: true
+    homeAssistant:
+      discovery: true # each modem appears as a device with signal, SIM and event entities
+      prefix: homeassistant

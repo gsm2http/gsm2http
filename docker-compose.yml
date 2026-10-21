@@ -1,0 +1,80 @@
+# gsm2http: one container serving the REST API, webhooks and web UI.
+#
+#   cp .env.example .env    # set API_TOKEN (openssl rand -hex 32), then edit as needed
+#   docker compose up -d --build
+#
+# Settings come from .env (or the shell environment). Edit `devices:` below to match your
+# modem's ports. See docs/DEPLOYMENT.md for the details and alternatives.
+name: gsm2http
+
+services:
+  gsm2http:
+    image: ${GSM2HTTP_IMAGE:-gsm2http:local}
+    build:
+      context: .
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # The container always listens on 0.0.0.0:9333; publish with GSM2HTTP_BIND/PORT.
+      PORT: '9333'
+      HOST: '0.0.0.0'
+    ports:
+      # Localhost only by default. Read docs/DEPLOYMENT.md ("Exposing it safely")
+      # before publishing it on a LAN address.
+      - '${GSM2HTTP_BIND:-127.0.0.1}:${GSM2HTTP_PORT:-9333}:9333'
+
+    # --- Modem access ---------------------------------------------------------
+    # Pass through only your modem's ports; never use privileged: true. Stable
+    # /dev/serial/by-id paths survive replugs and reboots. Restart the container after
+    # plugging in a new modem. Without a modem, delete devices and set MOCK_MODE=true.
+    devices:
+      - /dev/ttyUSB0
+      - /dev/ttyUSB1
+      - /dev/ttyUSB2
+    # Hotplug alternative (see docs/DEPLOYMENT.md): replace devices with these, so modems
+    # plugged in after start are visible. The cgroup rules allow only USB serial (188)
+    # and CDC-ACM (166) character devices; host /dev is mounted read-only.
+    # device_cgroup_rules:
+    #   - 'c 188:* rmw'
+    #   - 'c 166:* rmw'
+    # volumes:
+    #   - /dev:/dev:ro
+
+    # Optional notifier config file (see config.example.yaml). Mount it read-only and
+    # set CONFIG_FILE=/config/config.yaml in .env. With hotplug mode above, add this line
+    # to that volumes: list instead of repeating the key.
+    # volumes:
+    #   - ./config.yaml:/config/config.yaml:ro
+
+    # gid that owns /dev/ttyUSB* on the host: 20 (dialout) on Debian, Ubuntu and
+    # Raspberry Pi OS; check with: stat -c %g /dev/ttyUSB0
+    group_add:
+      - '${DIALOUT_GID:-20}'
+
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:9333/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    stop_grace_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
