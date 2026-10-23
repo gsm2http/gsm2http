@@ -18,7 +18,7 @@ A self-hosted, simplified SMS and call-control gateway for personal and small-si
 > **Alpha software.** It talks directly to your modem and SIM card. It can send SMS and place calls your carrier will bill you for, lock your SIM with wrong PINs, or behave unpredictably on untested firmware. **Try it with a prepaid SIM and a small balance.** You are responsible for your carrier's terms and your local laws. There is no warranty (see [LICENSE](LICENSE)).
 
 > [!NOTE]
-> **"GSM" means the command set, not the network generation.** gsm2http speaks the standard AT and SMS commands that started with GSM (3GPP TS 27.005/27.007). 3G and LTE USB sticks use the same commands, so they work too, as long as they expose a serial AT port.
+> **"GSM" means the command set, not the network generation.** gsm2http speaks the standard AT and SMS commands that started with GSM (3GPP TS 27.005/27.007). 2G/3G and LTE USB sticks use the same commands, so they work too, as long as they expose a serial AT port.
 
 ---
 
