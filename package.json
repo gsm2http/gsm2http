@@ -1,6 +1,6 @@
 {
   "name": "gsm2http",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Self-hosted SMS and call-control gateway that exposes USB cellular modems (2G/3G/4G/LTE) over HTTP: REST API in, webhooks out.",
   "license": "Apache-2.0",
