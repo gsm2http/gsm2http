@@ -22,8 +22,6 @@ export interface EncodePduOptions {
 }
 
 // GSM 7-bit default alphabet, TS 23.038 §6.2.1.
-// TODO: the spec has ò (U+00F2) at 0x08, not õ. Check against captured PDUs before changing,
-// because decodeHexPayloadIfNeeded relies on the same mapping.
 const GSM_7BIT_DEFAULT = [
   '@',
   '£',
@@ -33,7 +31,7 @@ const GSM_7BIT_DEFAULT = [
   'é',
   'ù',
   'ì',
-  'õ',
+  'ò',
   'Ç',
   '\n',
   'Ø',
@@ -170,7 +168,7 @@ const GSM_7BIT_EXTENDED: Record<number, string> = {
 
 /** Positions where unpacked GSM 7-bit differs from ASCII, for decodeHexPayloadIfNeeded. */
 const UNPACKED_GSM_LETTERS: Record<number, string> = {
-  0x08: 'õ',
+  0x08: 'ò',
   0x5b: 'Ä',
   0x5c: 'Ö',
   0x5e: 'Ü',
