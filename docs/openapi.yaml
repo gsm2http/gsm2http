@@ -12,9 +12,6 @@ info:
       versioned envelope goes to webhooks, MQTT and Socket.io.
     - **Socket.io:** the same events, streamed live. See `x-socketio` at the end of this file.
 
-    **Status markers.** Operations and fields tagged `x-status: planned` are designed but not
-    yet implemented. They are scheduled for `v0.1.0`.
-
     **Addressing a modem.** The `{modemId}` path parameter matches, in this order: the modem
     ID (`modem-1`), the full serial port path or its end (`ttyUSB0`), the IMEI, part of the
     model name (`e173`), or the phone number (digits only are compared).
@@ -109,8 +106,8 @@ paths:
         may contain line breaks but no other control characters. `SMS_MIN_INTERVAL_MS` and
         `SMS_DAILY_LIMIT` apply per modem.
 
-        (Planned:) the destination must match `ALLOWED_PREFIXES`, and an `Idempotency-Key`
-        header prevents duplicate sends.
+        Roadmap: the destination will have to match `ALLOWED_PREFIXES`, and an
+        `Idempotency-Key` header will prevent duplicate sends.
       parameters:
         - $ref: '#/components/parameters/ModemId'
       requestBody:
@@ -176,7 +173,7 @@ paths:
         until it has ended.
 
         The modem must support voice (`supportsVoice: true`). `CALLS_HOURLY_LIMIT` applies per
-        modem. (Planned:) the destination must match `ALLOWED_PREFIXES`.
+        modem. Roadmap: the destination will have to match `ALLOWED_PREFIXES`.
       parameters:
         - $ref: '#/components/parameters/ModemId'
       requestBody:

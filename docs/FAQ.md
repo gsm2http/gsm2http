@@ -8,7 +8,7 @@ In most places, yes. gsm2http is software that uses a modem you own and a SIM yo
 
 ### Can I use it for marketing or bulk SMS?
 
-No, and it isn't designed for that. It sends one message to one recipient per request, with rate limits on by default (planned), and it has no contact lists, campaigns or CSV import. Carriers block consumer SIMs that send bulk traffic, and commercial (A2P) messaging belongs on registered providers. Unsolicited marketing messages are illegal in many countries.
+No, and it isn't designed for that. It sends one message to one recipient per request, with rate limits on by default, and it has no contact lists, campaigns or CSV import. Carriers block consumer SIMs that send bulk traffic, and commercial (A2P) messaging belongs on registered providers. Unsolicited marketing messages are illegal in many countries.
 
 ### Is this a "SIM farm"?
 
@@ -46,7 +46,7 @@ chan_dongle makes the modem a phone line inside Asterisk, for PBX users. gsm2htt
 
 ### Where are my messages stored, and for how long?
 
-Currently they are not stored by gsm2http at all. They are forwarded to your webhook and the UI, then deleted from the SIM. From `v0.1.0` (planned), a local history is kept in `DATA_DIR` for `RETENTION_DAYS` (default 30). Setting `0` means message bodies are never stored. Nothing is sent anywhere except the webhooks and MQTT broker you configure.
+They are not stored by gsm2http at all. They are forwarded to your webhook and the UI, then deleted from the SIM. A local history (`DATA_DIR`, kept for `RETENTION_DAYS`, default 30, with `0` meaning message bodies are never stored) is on the roadmap. Nothing is sent anywhere except the webhooks and MQTT broker you configure.
 
 ### Is it safe to expose to the internet?
 

@@ -38,8 +38,6 @@ A self-hosted, simplified SMS and call-control gateway for personal and small-si
 
 ## Features
 
-Features marked **Planned** are designed and documented but not built yet. They are due in the first tagged release, `v0.1.0`.
-
 | Status | Feature |
 |---|---|
 | Available | **Receive SMS** as an `sms.received` event. Long messages are reassembled from their parts. GSM 7-bit and UCS-2 (emoji and non-Latin scripts) are both decoded. |
@@ -63,7 +61,7 @@ Not planned: bulk or campaign sending, contact lists, SIM rotation or pooling, I
 gsm2http needs a modem that exposes a **serial AT command port** (stick or "modem" mode). Many LTE sticks ship in **HiLink** mode, where they act as a network card with a built-in web UI and have no AT port. Those need a mode switch or different firmware first; see [DEPLOYMENT.md](docs/DEPLOYMENT.md#hilink-vs-stick-mode).
 
 > [!NOTE]
-> **2G vs 3G Network Sunsetting:**
+> **2G and 3G shutdowns**
 > Across the US, UK, and European Union, **3G networks are largely sunsetted** (frequencies refarmed for 4G and 5G). However, in many countries across Europe, Asia, and Africa, carriers intentionally keep **2G (GSM/GPRS) alive** for legacy IoT, smart meters, eCall, and SMS fallback.
 > Older "3G" modems like the Huawei E173 typically negotiate and fall back to **2G** to handle SMS and call signaling. If you are deploying an older stick, verify whether your mobile carrier operates a 2G network in your region. For long-term deployments, **4G/LTE** sticks or industrial modules are recommended.
 
@@ -110,7 +108,7 @@ curl -s -H "Authorization: Bearer $(sed -n 's/^API_TOKEN=//p' .env)" http://127.
 
 Open <http://127.0.0.1:9333> for the UI and sign in with the `API_TOKEN` from `.env`. Put your automation's URL in `WEBHOOK_URL` (and a `WEBHOOK_SECRET`) to receive `sms.received`, `call.incoming` and the other [events](docs/events.md), or set `MQTT_URL` to publish them to a broker.
 
-> Until the first image is published to GHCR (planned for `v0.1.0`), clone this repository, edit `devices:` in its `docker-compose.yml`, and run `docker compose up -d --build` instead. It builds the same single-container image (API and UI on port 9333) for amd64, arm64 or arm/v7.
+> To build the image yourself instead, clone this repository, edit `devices:` in its `docker-compose.yml`, and run `docker compose up -d --build`. It builds the same single-container image (API and UI on port 9333) for amd64, arm64 or arm/v7.
 
 **No modem yet?** Delete the `devices:` and `group_add:` blocks, add `MOCK_MODE=true` to `.env`, and use the UI's test buttons to simulate incoming SMS and calls.
 
@@ -144,17 +142,17 @@ Settings are environment variables. Webhook and MQTT sinks can also come from a 
 | `STATIC_DIR` | bundled UI | Available | Directory of the built web UI served on the same port; empty serves the API only |
 | `LOG_LEVEL` | `info` | Available | `debug` also logs every AT command and response (these contain phone numbers and message PDUs). Logs are JSON lines on stdout. |
 | `MAX_MODEMS` | `2` | Available | Use at most this many modems; further ports are not probed. The default matches what gsm2http is built for and stays well below the UK's five-SIM threshold (see [Responsible use](#responsible-use)). |
-| `ALLOWED_PREFIXES` | *(empty)* | Planned | Comma-separated E.164 prefixes (e.g. `+44,+353`) that SMS and calls may go to. **Empty means sending and dialling are disabled.** Premium-rate and international numbers are blocked unless you list them. |
+| `ALLOWED_PREFIXES` | *(empty)* | Roadmap | Comma-separated E.164 prefixes (e.g. `+44,+353`) that SMS and calls may go to. **Empty means sending and dialling are disabled.** Premium-rate and international numbers are blocked unless you list them. |
 | `SMS_MIN_INTERVAL_MS` | `10000` | Available | Minimum gap between outgoing SMS on each modem. `0` disables it. |
 | `SMS_DAILY_LIMIT` | `50` | Available | Maximum outgoing SMS per modem per 24 hours. `0` disables it. |
 | `CALLS_HOURLY_LIMIT` | `5` | Available | Maximum outgoing calls per modem per hour. `0` disables it. |
 | `UNLOCK_HOURLY_LIMIT` | `3` | Available | Maximum SIM PIN unlock attempts per modem per hour. `0` disables it; the last-PIN-attempt guard always applies. |
-| `DATA_DIR` | `/data` | Planned | Where the message history and audit log are stored |
-| `RETENTION_DAYS` | `30` | Planned | How long message bodies are kept. `0` means they are never stored. |
+| `DATA_DIR` | `/data` | Roadmap | Where the message history and audit log are stored |
+| `RETENTION_DAYS` | `30` | Roadmap | How long message bodies are kept. `0` means they are never stored. |
 
 Rate limits are kept in memory, so a restart resets them. A request over a limit gets `429` with a `Retry-After` header.
 
-> The defaults for planned settings may still change before `v0.1.0`. They are deliberately strict; raise them if your SIM plan and use case allow. [CHANGELOG.md](CHANGELOG.md) will record the final values.
+> Settings marked **Roadmap** are designed but not built yet, and their defaults may change. Like the rate limits, they are deliberately strict; raise them if your SIM plan and use case allow. [CHANGELOG.md](CHANGELOG.md) records each one when it ships.
 
 ## Architecture
 
@@ -254,7 +252,7 @@ gsm2http does what a phone does: it uses a modem you own and a SIM you pay for. 
 - **Your SIM, your contract.** Many consumer plans forbid "gateway devices" or automated, high-volume messaging. Read yours. For anything beyond personal use, get an M2M/IoT or business SIM that allows it.
 - **No bulk sending, by design.** Each request sends one message to one recipient, and the default rate limits keep it to personal scale. Commercial and marketing (A2P) traffic belongs on registered providers. Unsolicited messages are illegal in most countries, and carriers block SIMs that send them.
 - **UK users:** from **29 October 2026**, the Crime and Policing Act 2026 makes it an offence to possess or supply, without good reason, a device that can use **five or more physical SIMs** to make calls or send texts. gsm2http is software and is built for one or two modems and uses at most two by default (`MAX_MODEMS`). If you plan to connect more, read the [Home Office guidance](https://www.gov.uk/government/publications/possession-and-supply-of-sim-farms/crime-and-policing-act-2026-guidance-offences-relating-to-the-possession-and-supply-of-sim-farms-and-legitimate-uses-of-multiple-sim-devices-accessi) first.
-- **Privacy.** Stored messages contain other people's phone numbers and words. Purely personal use usually falls under data-protection household exemptions. A business deployment does not, so keep retention (planned) short and delete what you don't need.
+- **Privacy.** Stored messages contain other people's phone numbers and words. Purely personal use usually falls under data-protection household exemptions. A business deployment does not, so keep retention short and delete what you don't need.
 - **No call recording.** gsm2http has no audio path. If audio is ever added, recording will be off by default and documented with consent requirements.
 - **It can't intercept anyone else's messages.** It only sees SMS sent to the SIM in your modem.
 

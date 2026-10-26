@@ -9,8 +9,6 @@ gsm2http runs as a single Node.js process that owns the modem's serial ports, ex
 | Bare metal + systemd | No Docker, smallest footprint | [Running without Docker](#running-without-docker) |
 | macOS, natively | Development (Docker Desktop cannot pass USB through) | [macOS](#macos-development) |
 
-Items marked *planned* are due in `v0.1.0` and are not built yet.
-
 > **Security:** gsm2http will not start without an `API_TOKEN` (at least 32 characters; `openssl rand -hex 32`). The REST API, the Socket.io stream and the web UI all require it. Everything below still binds to `127.0.0.1` by default; read [Exposing it safely](#exposing-it-safely) before changing that.
 
 ## Before you start
