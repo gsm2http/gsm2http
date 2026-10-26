@@ -11,6 +11,8 @@ export interface Config {
   modemPorts: string[];
   /** IMEI or model name → SIM phone number. Most SIMs don't report their own number. */
   modemNumbers: Record<string, string>;
+  /** Modems beyond this many are ignored. */
+  maxModems: number;
   /** Forced drivers per port; empty means auto-detect. */
   modemDrivers: DriverOverrides;
   /** Webhook and MQTT sinks, from CONFIG_FILE and the WEBHOOK_* / MQTT_* variables. */
@@ -40,6 +42,9 @@ export interface RateLimits {
 /** Shorter tokens are refused: the API can send SMS and dial at the owner's expense. */
 export const MIN_API_TOKEN_LENGTH = 32;
 
+/** Personal and small-site use; see "Responsible use" in the README. */
+export const DEFAULT_MAX_MODEMS = 2;
+
 /** Lower values would keep a modem's AT queue busy with housekeeping. */
 const MIN_INTERVAL_MS = 5_000;
 
@@ -53,6 +58,7 @@ export function loadConfig(env: Env = process.env): Config {
     modemPorts: parsePortList(env.MODEM_PORTS),
     modemNumbers: parseModemNumbers(env.MODEM_NUMBERS),
     modemDrivers: parseDriverOverrides(env.MODEM_DRIVER),
+    maxModems: parsePositiveInt(env.MAX_MODEMS, DEFAULT_MAX_MODEMS, 'MAX_MODEMS'),
     notifiers: loadNotifiersConfig(env),
     defaultCallDurationMs: parsePositiveInt(
       env.DEFAULT_CALL_DURATION_MS,

@@ -100,4 +100,20 @@ describe('ModemManager driver selection', () => {
     assert.equal(result.parts, 1);
     assert.equal(acme.stream.simulator!.sentPdus.length, 1);
   });
+
+  it('starts no more modems than maxModems', () => {
+    manager = new ModemManager({
+      mockMode: true,
+      maxModems: 2,
+      mockFleet: [
+        { id: 'modem-1', name: 'A', portPath: '/dev/ttyUSB7', profile: GENERIC_PROFILE },
+        { id: 'modem-2', name: 'B', portPath: '/dev/ttyUSB8', profile: GENERIC_PROFILE },
+        { id: 'modem-3', name: 'C', portPath: '/dev/ttyUSB9', profile: GENERIC_PROFILE },
+      ],
+    });
+    assert.deepEqual(
+      manager.getModemList().map((m) => m.id),
+      ['modem-1', 'modem-2'],
+    );
+  });
 });

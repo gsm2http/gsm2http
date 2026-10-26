@@ -8,11 +8,11 @@ In most places, yes. gsm2http is software that uses a modem you own and a SIM yo
 
 ### Can I use it for marketing or bulk SMS?
 
-No, and it isn't designed for that. It sends one message to one recipient per request, with rate limits on by default (planned), and it has no contact lists, campaigns or CSV import. Carriers block consumer SIMs that send bulk traffic, and commercial (A2P) messaging belongs on registered providers. Unsolicited marketing messages are illegal in many countries.
+No, and it isn't designed for that. It sends one message to one recipient per request, with rate limits on by default, and it has no contact lists, campaigns or CSV import. Carriers block consumer SIMs that send bulk traffic, and commercial (A2P) messaging belongs on registered providers. Unsolicited marketing messages are illegal in many countries.
 
 ### Is this a "SIM farm"?
 
-No. It is built for one or two modems on something like a Raspberry Pi. It has no SIM rotation, SIM pooling or load spreading across SIMs, it never changes a modem's IMEI, and it has no VoIP side. By default it will use at most two modems (`MAX_MODEMS=2`, planned).
+No. It is built for one or two modems on something like a Raspberry Pi. It has no SIM rotation, SIM pooling or load spreading across SIMs, it never changes a modem's IMEI, and it has no VoIP side. By default it uses at most two modems (`MAX_MODEMS=2`).
 
 **UK users:** from 29 October 2026, the Crime and Policing Act 2026 makes it an offence to possess or supply, without good reason or lawful authority, a device that can use **five or more physical SIMs** to make calls or send texts. The [Home Office guidance](https://www.gov.uk/government/publications/possession-and-supply-of-sim-farms/crime-and-policing-act-2026-guidance-offences-relating-to-the-possession-and-supply-of-sim-farms-and-legitimate-uses-of-multiple-sim-devices-accessi) describes legitimate uses. Read it before you connect five or more SIMs to one machine.
 
@@ -46,7 +46,7 @@ chan_dongle makes the modem a phone line inside Asterisk, for PBX users. gsm2htt
 
 ### Where are my messages stored, and for how long?
 
-Currently they are not stored by gsm2http at all. They are forwarded to your webhook and the UI, then deleted from the SIM. From `v0.1.0` (planned), a local history is kept in `DATA_DIR` for `RETENTION_DAYS` (default 30). Setting `0` means message bodies are never stored. Nothing is sent anywhere except the webhooks and MQTT broker you configure.
+They are not stored by gsm2http at all. They are forwarded to your webhook and the UI, then deleted from the SIM. A local history (`DATA_DIR`, kept for `RETENTION_DAYS`, default 30, with `0` meaning message bodies are never stored) is on the roadmap. Nothing is sent anywhere except the webhooks and MQTT broker you configure.
 
 ### Is it safe to expose to the internet?
 

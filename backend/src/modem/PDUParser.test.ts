@@ -42,6 +42,16 @@ describe('PDUParser', () => {
     assert.equal(parsed.isMultipart, false);
   });
 
+  it('maps 0x08 to ò as TS 23.038 does, and sends õ as UCS-2', () => {
+    assert.equal(PDUParser.decodeGsm7Bit([0x08]), 'ò');
+
+    // TP-DCS follows the 11-digit destination: 00 is GSM 7-bit, 08 is UCS-2.
+    const dcs = (text: string) =>
+      PDUParser.encodeSubmitPdus({ recipient: '+15555550100', text })[0]!.pdu.slice(24, 26);
+    assert.equal(dcs('però'), '00');
+    assert.equal(dcs('kõne'), '08');
+  });
+
   it('should decode alphanumeric senders correctly', () => {
     const pduHex = PDUParser.encodeDeliverPdu({
       sender: 'SUPER',

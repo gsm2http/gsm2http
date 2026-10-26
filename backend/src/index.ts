@@ -27,6 +27,7 @@ const modems = new ModemManager({
   ports: config.modemPorts,
   phoneNumbers: config.modemNumbers,
   driverOverrides: config.modemDrivers,
+  maxModems: config.maxModems,
   scanIntervalMs: config.scanIntervalMs,
   pollIntervalMs: config.pollIntervalMs,
 });

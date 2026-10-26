@@ -15,6 +15,7 @@ describe('config', () => {
     assert.equal(config.host, '127.0.0.1');
     assert.equal(config.scanIntervalMs, 15_000);
     assert.equal(config.pollIntervalMs, 30_000);
+    assert.equal(config.maxModems, 2);
     assert.equal(config.apiToken, TOKEN);
     assert.deepEqual(config.corsOrigins, []);
     assert.deepEqual(config.rateLimits, {
@@ -64,6 +65,13 @@ describe('config', () => {
       () => loadConfig({ API_TOKEN: TOKEN, UNLOCK_HOURLY_LIMIT: '-1' }),
       /UNLOCK_HOURLY_LIMIT/,
     );
+  });
+
+  it('parses MAX_MODEMS and rejects anything but a positive whole number', () => {
+    assert.equal(loadConfig({ API_TOKEN: TOKEN, MAX_MODEMS: '4' }).maxModems, 4);
+    for (const MAX_MODEMS of ['0', '-1', '1.5', 'many']) {
+      assert.throws(() => loadConfig({ API_TOKEN: TOKEN, MAX_MODEMS }), /MAX_MODEMS/);
+    }
   });
 
   it('rejects scan and poll intervals below 5 s', () => {

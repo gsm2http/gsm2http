@@ -39,6 +39,8 @@ export interface ModemManagerOptions {
   scanIntervalMs?: number;
   /** Passed to each ModemStream; see DEFAULT_POLL_INTERVAL_MS. */
   pollIntervalMs?: number;
+  /** Modems beyond this many are left alone (MAX_MODEMS); undefined means no limit. */
+  maxModems?: number;
 }
 
 interface CandidatePort {
@@ -98,6 +100,9 @@ export class ModemManager extends EventEmitter<ModemManagerEvents> {
   private readonly driverOverrides: DriverOverrides;
   private readonly registry: DriverRegistry;
   private readonly mockFleet: MockModemDefinition[];
+  private readonly maxModems: number;
+  /** Set once the limit has been logged, so each scan doesn't repeat the warning. */
+  private limitLogged = false;
   private isScanning = false;
   private scanTimer: NodeJS.Timeout | undefined;
   private initialScanTimer: NodeJS.Timeout | undefined;
@@ -112,6 +117,7 @@ export class ModemManager extends EventEmitter<ModemManagerEvents> {
     this.registry = options.registry ?? defaultDriverRegistry;
     this.mockFleet = options.mockFleet ?? DEFAULT_MOCK_FLEET;
     this.pollIntervalMs = options.pollIntervalMs;
+    this.maxModems = options.maxModems ?? Infinity;
 
     if (this.mockMode) {
       this.createMockModems();
@@ -139,9 +145,16 @@ export class ModemManager extends EventEmitter<ModemManagerEvents> {
    * real hardware: the driver is chosen from the identity a probe would read.
    */
   private createMockModems(): void {
-    log.info({ count: this.mockFleet.length }, 'starting simulated modems');
+    const fleet = this.mockFleet.slice(0, this.maxModems);
+    if (fleet.length < this.mockFleet.length) {
+      log.warn(
+        { maxModems: this.maxModems, skipped: this.mockFleet.length - fleet.length },
+        'MAX_MODEMS reached: not starting the rest of the mock fleet',
+      );
+    }
+    log.info({ count: fleet.length }, 'starting simulated modems');
 
-    for (const def of this.mockFleet) {
+    for (const def of fleet) {
       const simulator = new SimulatedModem(def.profile, def.portPath);
       const identity = simulator.identity;
       this.register(
@@ -221,6 +234,7 @@ export class ModemManager extends EventEmitter<ModemManagerEvents> {
       }
       parser.close();
       this.modems.delete(id);
+      this.limitLogged = false;
       // Probe again right away: the replugged stick may come back on another port.
       this.probeRejections.clear();
       this.emit('removed', { ...stream.getInfo(), connected: false });
@@ -285,6 +299,18 @@ export class ModemManager extends EventEmitter<ModemManagerEvents> {
         const realPath = resolvePath(candidate.path);
         if (activePorts.has(realPath)) continue;
         activePorts.add(realPath);
+
+        // Checked before probing, so ports beyond the limit never receive AT commands.
+        if (this.modems.size >= this.maxModems) {
+          if (!this.limitLogged) {
+            log.warn(
+              { maxModems: this.maxModems, port: candidate.path },
+              'MAX_MODEMS reached: ignoring further ports until a modem is removed',
+            );
+            this.limitLogged = true;
+          }
+          break;
+        }
 
         const stamp = nodeStamp(realPath);
         const rejection = this.probeRejections.get(realPath);
