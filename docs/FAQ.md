@@ -12,7 +12,7 @@ No, and it isn't designed for that. It sends one message to one recipient per re
 
 ### Is this a "SIM farm"?
 
-No. It is built for one or two modems on something like a Raspberry Pi. It has no SIM rotation, SIM pooling or load spreading across SIMs, it never changes a modem's IMEI, and it has no VoIP side. By default it will use at most two modems (`MAX_MODEMS=2`, planned).
+No. It is built for one or two modems on something like a Raspberry Pi. It has no SIM rotation, SIM pooling or load spreading across SIMs, it never changes a modem's IMEI, and it has no VoIP side. By default it uses at most two modems (`MAX_MODEMS=2`).
 
 **UK users:** from 29 October 2026, the Crime and Policing Act 2026 makes it an offence to possess or supply, without good reason or lawful authority, a device that can use **five or more physical SIMs** to make calls or send texts. The [Home Office guidance](https://www.gov.uk/government/publications/possession-and-supply-of-sim-farms/crime-and-policing-act-2026-guidance-offences-relating-to-the-possession-and-supply-of-sim-farms-and-legitimate-uses-of-multiple-sim-devices-accessi) describes legitimate uses. Read it before you connect five or more SIMs to one machine.
 
