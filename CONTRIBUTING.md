@@ -145,8 +145,3 @@ Releases are automated with [release-please](https://github.com/googleapis/relea
 3. release-please tags `vX.Y.Z` and creates the GitHub Release with that changelog section. The same workflow then builds `ghcr.io/gsm2http/gsm2http` for `linux/amd64`, `linux/arm64` and `linux/arm/v7` and pushes it as `X.Y.Z` and `X.Y`, plus `X` from `1.0.0` on, and `latest` for releases without a pre-release suffix. Images carry SBOM and build-provenance attestations.
 
 Pushing a `vX.Y.Z` tag by hand also publishes the image, but skips the changelog and GitHub Release. Prefer the release PR.
-
-For the first release (`v0.1.0`) only:
-
-- `release-please-config.json` pins `"release-as": "0.1.0"`. Remove it in the first PR after the release, or every later release PR will propose `0.1.0` again.
-- The changelog was written by hand under `## [Unreleased]`, and release-please starts from `bootstrap-sha`, the commit before the release tooling. Just before you merge the release PR, move the `Unreleased` notes into its `0.1.0` section on the PR branch and delete the `[Unreleased]` heading and link. After merging, paste the same notes into the body of the `v0.1.0` GitHub Release, since its body comes from the commit titles only.
